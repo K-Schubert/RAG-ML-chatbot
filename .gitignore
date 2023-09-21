@@ -1,0 +1,6 @@
+/data
+.env
+.DS_Store
+/venv_rag
+/nougat
+/arxiv_bot
