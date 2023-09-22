@@ -223,4 +223,4 @@ python3 naiveRAGbot.py -q -i rag-ml -k 3
 python3 naiveRAGbot.py -c -i rag-ml -k 3 -m 3
 ```
 
-![Chatbot interaction](media/chatbot_interaction.png)
+![Chatbot interaction](media/chatbot.png)
