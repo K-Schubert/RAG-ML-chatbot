@@ -1,6 +1,10 @@
-/data
 .env
 .DS_Store
+.ipynb_checkpoints/
+__pycache__
+
+/data
 /venv_rag
 /nougat
 /arxiv_bot
+/qlora
