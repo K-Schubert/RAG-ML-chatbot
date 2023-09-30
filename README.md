@@ -12,10 +12,10 @@ Additionally, I implement a simple semantic search functionality and a RAG Agent
 
 At the moment, the following RAG models are implemented in this project:
 
-- __Semantic Search__: Simple Semantic Similarity Search based on a user query.
-- __RAG QA__: Question/Answering with RAG.
-- __Naive RAG Agent__: An AI Agent Chatbot decides when to use a Vector DB Similarity Search depending on the query (faster).
-- __NeMo Guardrails RAG Agent__: An AI Agent is programmed with guardrails to define desirable behaviour when greeting the user, acceptable chat topics as well as canonical forms and utterances to speed up generation and provide relevant context from the Datastore/Knowledge Base.
+- ** Semantic Search ** : Simple Semantic Similarity Search based on a user query.
+- ** RAG QA ** : Question/Answering with RAG.
+- ** Naive RAG Agent ** : An AI Agent Chatbot decides when to use a Vector DB Similarity Search depending on the query (faster).
+- ** NeMo Guardrails RAG Agent ** : An AI Agent is programmed with guardrails to define desirable behaviour when greeting the user, acceptable chat topics as well as canonical forms and utterances to speed up generation and provide relevant context from the Datastore/Knowledge Base.
 
 ## Related Works
 I present below the latest work on Retrieval Augmented Generation and promising techniques which will be implemented in this repo. The following papers follow the idea that powerful retrievers allow the use of smaller LLMs for generation, reducing training cost and latency while maintaining performance compared to large LLMs.
@@ -23,34 +23,34 @@ I present below the latest work on Retrieval Augmented Generation and promising 
 #### Fine-tuning/Eval on open-domain QA
 These techniques mainly insert retrieved context into the LLM prompt.
 
-	* __REALM (2020)__: Retrieve chunks of context, feed into prompt, perform one retrieval step. MLM + QA fine-tuning. [paper](https://arxiv.org/abs/2002.08909), [repo](https://github.com/google-research/language/blob/master/language/realm/README.md)
-	* __DPR (2020)__: Pipeline training, fine-tuning on QA (no MLM). [paper](https://arxiv.org/abs/2004.04906), [repo](https://github.com/facebookresearch/DPR)
-	* __RAG (2020)__: Generative approach instead of MLM, fine-tuning on QA and knowledge intensive tasks. [paper](https://arxiv.org/abs/2005.11401)
-	* __Atlas (2022)__: Combien RAG with retrieval-based language model pre-training (encoder-decoder architecture), fine-tuning on QA and QA tasks. Analysis of efficient fine-tuning to specific domain. [paper](https://arxiv.org/pdf/2208.03299.pdf), [repo](https://github.com/facebookresearch/atlas) 
+	* ** REALM (2020) ** : Retrieve chunks of context, feed into prompt, perform one retrieval step. MLM + QA fine-tuning. [paper](https://arxiv.org/abs/2002.08909), [repo](https://github.com/google-research/language/blob/master/language/realm/README.md)
+	* ** DPR (2020) ** : Pipeline training, fine-tuning on QA (no MLM). [paper](https://arxiv.org/abs/2004.04906), [repo](https://github.com/facebookresearch/DPR)
+	* ** RAG (2020) ** : Generative approach instead of MLM, fine-tuning on QA and knowledge intensive tasks. [paper](https://arxiv.org/abs/2005.11401)
+	* ** Atlas (2022) ** : Combien RAG with retrieval-based language model pre-training (encoder-decoder architecture), fine-tuning on QA and QA tasks. Analysis of efficient fine-tuning to specific domain. [paper](https://arxiv.org/pdf/2208.03299.pdf), [repo](https://github.com/facebookresearch/atlas) 
 
 #### In-Context Retrieval (LM perplexity)
 These techniques mainly use the LLM logit perplexity for the next token prediction as a signal for retrieval, insert context into prompt and retrieve-in-context.
 
-	* __In-Context RALM (2023)__ + __REPLUG (2023)__: Shorter prefix (more recent tokens) helps and retrieving more frequently helps (but is inefficient and costly). Retrieve chunks of context, feed into prompt, perform retrieval every n tokens (n>1). [RALM paper](https://arxiv.org/abs/2302.00083), [RALM repo](https://github.com/AI21Labs/in-context-ralm), [REPLUG paper](https://arxiv.org/abs/2301.12652)
-	* __RETRO (2021)__: Feed retrieved tokens (embeddings) into intermediate LLM layers (decoder head). Designed for many chunks, frequently, more efficiently. Chunked cross-attention (CCA) design: can use many blocks more frequently/efficiently BUT need training of model to learn CCA params. Increasing model parameters improves performance, the larger datastore the better (tested with 1.8 trillion tokens). Retrieve chunks of context, feed into intermediate layers, perform retrieval every n tokens (n>1). [paper](https://arxiv.org/abs/2112.04426), [repo](https://github.com/lucidrains/RETRO-pytorch)
-	* __kNN-LM (2020)__: LM outputs a nonparametric distribution over tokens in data, can be seen as an incorporation in the output layer. Which tokens in datastore are close to the next token? Which prefixes in datastore are close to the current prefix? Which vectors in datastore are close to the prefix (prompt) embedding? Outperforms no-retrieval LM, better with bigger datastore, better with bigger k. Retrieve tokens, feed into output layer, perform retrieval every token. More fine-grained retrieval, can be better at rare patterns + out of domain, datastore is expensive in space vs chunks. [paper](https://arxiv.org/pdf/1911.00172.pdf), [repo](https://github.com/urvashik/knnlm)
+	* ** In-Context RALM (2023) **  + ** REPLUG (2023) ** : Shorter prefix (more recent tokens) helps and retrieving more frequently helps (but is inefficient and costly). Retrieve chunks of context, feed into prompt, perform retrieval every n tokens (n>1). [RALM paper](https://arxiv.org/abs/2302.00083), [RALM repo](https://github.com/AI21Labs/in-context-ralm), [REPLUG paper](https://arxiv.org/abs/2301.12652)
+	* ** RETRO (2021) ** : Feed retrieved tokens (embeddings) into intermediate LLM layers (decoder head). Designed for many chunks, frequently, more efficiently. Chunked cross-attention (CCA) design: can use many blocks more frequently/efficiently BUT need training of model to learn CCA params. Increasing model parameters improves performance, the larger datastore the better (tested with 1.8 trillion tokens). Retrieve chunks of context, feed into intermediate layers, perform retrieval every n tokens (n>1). [paper](https://arxiv.org/abs/2112.04426), [repo](https://github.com/lucidrains/RETRO-pytorch)
+	* ** kNN-LM (2020) ** : LM outputs a nonparametric distribution over tokens in data, can be seen as an incorporation in the output layer. Which tokens in datastore are close to the next token? Which prefixes in datastore are close to the current prefix? Which vectors in datastore are close to the prefix (prompt) embedding? Outperforms no-retrieval LM, better with bigger datastore, better with bigger k. Retrieve tokens, feed into output layer, perform retrieval every token. More fine-grained retrieval, can be better at rare patterns + out of domain, datastore is expensive in space vs chunks. [paper](https://arxiv.org/pdf/1911.00172.pdf), [repo](https://github.com/urvashik/knnlm)
 
 #### Adaptive retrieval: follows retrieve-in-context (text chunks) and kNN-LM (tokens)
 
-	* __FLARE__: Model starts answering a question, if probability of next token is low (model is uncertain), look up relevant documents, continue generation with retrieval, repeat until finished. More efficient, decision may not always be optimal. [paper](https://arxiv.org/abs/2305.06983), [repo](https://github.com/jzbjyb/FLARE)
+	* ** FLARE ** : Model starts answering a question, if probability of next token is low (model is uncertain), look up relevant documents, continue generation with retrieval, repeat until finished. More efficient, decision may not always be optimal. [paper](https://arxiv.org/abs/2305.06983), [repo](https://github.com/jzbjyb/FLARE)
 
 #### Entity Retrieval
 These techniques retrieve entities or entity mentions, retrieved context goes to intermediate layers, retrieval for every entity mention.
 
-	* __Entities as Experts (2020)__: [paper](https://arxiv.org/abs/2004.07202)
-	* __Mention Memory (2022)__: [paper](https://arxiv.org/abs/2110.06176)
+	* ** Entities as Experts (2020) ** : [paper](https://arxiv.org/abs/2004.07202)
+	* ** Mention Memory (2022) ** : [paper](https://arxiv.org/abs/2110.06176)
 	--> effective for entity-centric tasks and is space-efficient, but requires entity detection.
 
 #### Retrieval for Long-Range LM
 
-	* __Memorizing Transformers (2022)__: Datastore is based on input instead of external text corpus, kNN search incorporated in the attention layer. [paper](https://arxiv.org/abs/2203.08913), [repo](https://github.com/lucidrains/memorizing-transformers-pytorch)
-	* __Unlimiformer (2023)__: [paper](https://arxiv.org/abs/2305.01625), [repo](https://github.com/abertsch72/unlimiformer)
-	* __Long-Range LM with Self-Retrieval (2023)__: [paper](https://arxiv.org/abs/2306.13421). Retrieve text chunks from the input, retrieved context goes to intermediate layers, retrieval once or every n tokens.
+	* ** Memorizing Transformers (2022) ** : Datastore is based on input instead of external text corpus, kNN search incorporated in the attention layer. [paper](https://arxiv.org/abs/2203.08913), [repo](https://github.com/lucidrains/memorizing-transformers-pytorch)
+	* ** Unlimiformer (2023) ** : [paper](https://arxiv.org/abs/2305.01625), [repo](https://github.com/abertsch72/unlimiformer)
+	* ** Long-Range LM with Self-Retrieval (2023) ** : [paper](https://arxiv.org/abs/2306.13421). Retrieve text chunks from the input, retrieved context goes to intermediate layers, retrieval once or every n tokens.
 
 #### Summary of Recent Developments
 	* In general, more frequent retrieval equates with better performance but is slower.
