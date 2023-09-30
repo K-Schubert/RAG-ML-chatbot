@@ -18,7 +18,7 @@ At the moment, the following RAG implementation are implemented in this project:
 - **NeMo Guardrails RAG Agent**: An AI Agent is programmed with guardrails to define desirable behaviour when greeting the user, acceptable chat topics as well as canonical forms and utterances to speed up generation and provide relevant context from the Datastore/Knowledge Base.
 
 ## Related Works
-I present below the latest work on Retrieval Augmented Generation and promising techniques which will be implemented in this repo.
+I present below the latest work on Retrieval Augmented Generation and promising techniques which will be implemented in this repo. The following papers follow the idea that powerful retrievers allow the use of smaller LLMs for generation, reducing training cost and latency while maintaining performance compared to large LLMs.
 
 #### Fine-tuning/Eval on open-domain QA
 These techniques mainly insert retrieved context into the LLM prompt.
@@ -70,6 +70,8 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 	* Huggingface RAG with Ray (2x inference speedup): [code](https://huggingface.co/blog/ray-rag)
 	* Sparse retrieval with BM25 as retriever: [paper](https://arxiv.org/pdf/2212.10511.pdf), [paper](https://arxiv.org/pdf/2302.00083.pdf)
 	* Prompt decomposition: [paper](https://arxiv.org/abs/2212.14024), [paper](https://arxiv.org/abs/2210.03350)
+	* DSPy: [paper](https://arxiv.org/abs/2212.14024), [repo](https://github.com/stanfordnlp/dspy)
+	* HyDE: [paper](https://arxiv.org/abs/2212.10496)
 
 ### To Do
 
@@ -103,7 +105,6 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 - [x] Setup Pinecone Vector DB
 - [x] Upsert document embeddings into Vector DB.
 - [ ] Add paper submission date to docs for filtering
-- [ ] Use "dotproduct" as similarity metric for text-embedding-ada-002 model
 
 #### RAG Chatbot
 - [x] Setup Naive RAG Chatbot
@@ -117,6 +118,7 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 - [ ] Add chart captioning tool
 
 #### Open-Source Implementation
+- [ ] Setup Constitutional model in Langchain
 - [ ] Setup LLama2 as LLM
 - [ ] Setup sentence-transformers for document embeddings
 - [ ] Tokenizer
@@ -146,47 +148,7 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 	* RAG provides sources for fact-checking
 	* Arxiv papers are not yet peer reviewed
 	* LLM can leak training data via adversarial attacks
-	* Constituional AI
-
-## Retrieval
-Edge cases of SS: 
-	* repeated information: documents have same set of info, duplicated documents -> remove duplicates, optimize for diversity, contextual compression (langchain), max marginal relevance (select top k docs by cosine similarity then reranking through query similarity and difference to previously selected docs) (langchain)
-	* conflicting information: -> preference ranking of sources -> importance weighting (langchain)
-	* temporality: info can update over time -> reflection (with the concept of entities), recency weighting for retrieval, include timestamp in generation step -> entity memory (langchain), time weighting (langchain)
-	* metadata querying: questions can be more about metadata than content -> dynamically generate metadata filter -> self-querying retriever (langchain)
-	* multi-hop questions: query that requires multiple queries -> use an agent (langchain self-querying) -> sequential reasoning 
-
-What to retrieve: text chunks/tokens/something else?
-How to use retrieval? 
-	- inject context into LLM prompt (current method)
-	- insert retrieval into LLM architecture: attention heads in decoder can figure out what tokens to retrieve from KB
-	- use attention head output as a query vector
-	- transform vector space with affine transform conditioned on query (expand certain dims and contract others -> eg. PEFT increase) -> learn a model that can generate an affine transform -> change vector space on the fly -> cheap (if transform is invertible, apply transform to query and not entire vector space)
-	- inject additional embeddings weighted by the output logits the model has generated
-When to retrieve?
-	- currently in one step
-	- can retrieve at every token generation step (and feed back context into model)
-	- conditional retrieval: if next token has high perplexity (proba distr. is bad at predicting sample) -> ground generation with retrieved context
-
-Time-dependent retrieval:
-	* filter on metadata
-	* cosine sim with time decay
-
-Long context windows:
-	* model performs bad with longer context (attention can't attend as well), and distractors (incidentally useful info) is bad for performance
-	* relevance of context docs is really important
-
-Kowledge graph retrieval:
-	* reranking: find related entites in KG after SS
-	* contrastically pretrained embedding models don't encode relationships between entities 
-	* how to encode relationships in vector space?
-	* we only encode statistical relationships and not logical relationships training on loss -> hallucinations (statistically likely generations that ignore grounded representation of real world)
-
-Retrieval in production
-	* use ss that can scale to cluster efficiently
-	* reduce vector embedding size
-	* write only part of index to disk and keep part in memory
-	* lots of RAM
+	* Constituional AI + RLAIF: get a model to aign itself, critique itself based on constitution rules (eg. don't be harmful, unethical, toxic, sexist, dangerous, racist, illegal, etc.) through prompting and finetuning
 
 ## Arxiv Scraping
 ML research papers are scraped from Arxiv in PDF format.
@@ -211,7 +173,7 @@ The first version of the project extracted PDF content using PyPDF2. However, th
 		- Use retrieval tool with Agent
 
 ## ReAct RAG Agent
-Agents use an LLM to determine which actions to take and in what order. An action can either be using a tool and observing its output, or returning a response to the user. Here, the LLM is used as a reasoning engine and is connected to other sources of data/knowledge: search, APIs, DBs, calculators, run code, etc.
+ReAct (Reasoning/Action) Agents use an LLM to determine which actions to take and in what order. An action can either be using a tool and observing its output, or returning a response to the user. Here, the LLM is used as a reasoning engine and is connected to other sources of data/knowledge: search, APIs, DBs, calculators, run code, etc.
 
 ![qa](media/react.png)
 
@@ -234,31 +196,20 @@ Agents use an LLM to determine which actions to take and in what order. An actio
 	- HuggingGPT: task planner, connects AI models to solve AI tasks (ChatGPT selects models based on their huggingface description, executes subtasks and summarizes response)
 
 ## Guardrails RAG
-Safety and topic guidance, deterministic dialogue, RAG, Conversational agents
-For safety + faster RAG (Agent chooses to use retrieval KB tool if necessary, else answers queries fast)
-Implement guardrails: user asks about unethical questions or chatbot outputs unaligned response. 
-
-Previously: Adds safety and deterministic rules about topics -> agent will implement a security measure
-Common discussions can be put on discussion "rails"
-
-Now: Agent can also access tools
+Guardrails are used for safety and topic guidance, to setup a deterministic dialogue flow, for RAG and conversational agents. Guardrails can enhance safety and reduce chatbot response latency if using RAG (Agent chooses to use a retrieval KB tool if necessary, otherwise the chatbot answers regular queries without retrieval, hence one less LLM call).
 
 topics.co: define hardcoded behaviours (not necessary)
 
-Canonical forms are defined (eg. define user ask weapon) and utterances are hardcoded (eg. how to make a dirty bomb) and embedded into vector space. User queries are also embedded into vector space. If the query is similar to utterances of a given canonical form, the user query activates a flow according to the closest canonical form (eg. "what is PEFT?" -> "user ask LLM training")
+How does it work? Canonical forms are defined (eg. "define user ask weapon") and utterances are hardcoded (eg. "how to make a dirty bomb") and embedded into vector space. User queries are also embedded into vector space. If the query is similar to utterances of a given canonical form, the user query activates a flow according to the closest canonical form (eg. "what is PEFT?" -> "user ask LLM training"). Here I use the NeMO framework by Nvidia which defines ```topics.co``` and ```config.yaml``` files and the colang programming language to guide chatbot conversational flows.
 
 --> finetune LLM to generate topics.co canonical forms and utterances based on ML research papers.
 
-colang: language built by nvidia to guide chatbot conversational flows
-
 ```
+# need to export OpenAI API key and configure guardrails bot to use Nvidia CLI
 export OPENAI_API_KEY={OPENAI_API_KEY}
 source ~/.zshrc
 nemoguardrails chat --config=config/
 ```
-
---> nemo-guardrails-rag: faster than RAG Agent (one less LLM call)
-
 
 You might run into certificate problems on an Apple Silicon machine. If so run the command below:
 ```
@@ -267,7 +218,7 @@ bash /Applications/Python*/Install\ Certificates.command
 ## FLARE RAG
 
 ## Open-Source Implementation
-After prototype a base system with OpenAI ```gpt-3.5-turbo``` API, the goal is to implement an open-source RAG Chatbot, leveraging Llama-2 as the LLM and sentence-transformers as the vector embedding model. 
+After prototype a base system with OpenAI ```gpt-3.5-turbo``` API, the goal is to implement an open-source RAG Chatbot, leveraging ```Llama-2``` as the LLM and sentence-transformers as the vector embedding model. 
 
 #### Vector Embedding Fine-Tuning
 A model such as ```text-embedding-ada-002``` trained on classic Information Retrieval datasets (eg. MSMarco, TREC, BeIR, MTEB) may not adapt well to out of domain text. It is thus of interest to investigate the performance of a custom embedding model trained on a specialized corpus.
@@ -298,7 +249,7 @@ Here I finetune ```llama-2-7b``` on the scraped ML papers dataset, where I gener
 Here I finetune ```llama-2-7b``` on a chatbot conversation dataset.
 
 #### Alpaca finetuning
-Here I finetune ```llama-2-7b``` on the Alpaca dataset (format: task instruction, input context, response) in the self-instruct style:
+Here I finetune ```llama-2-7b``` on the Alpaca dataset (format: task instruction, input context, response) in the self-instruct style for model alignment:
 
 ```
 # alpaca example
@@ -320,10 +271,22 @@ Try out FAISS, other optimisations for vector search (inverted index, approximat
 Try out different proposed methods described in [Related Works](#related-works).
 
 #### Knowledge Distillation
-Here I distill the finetuned LLM with [Knowledge Distillation](https://arxiv.org/abs/1503.02531). The idea is to train a small student model which learns to align its outputs on a larger teacher model, achieving similar performance at a much lower cost.
+Here I distill the finetuned LLM with [Knowledge Distillation](https://arxiv.org/abs/1503.02531). The idea is to train a small student model which learns to align its outputs on a larger teacher model, achieving similar performance at a much lower cost. Aligning the student model on the output probability distribution of the teacher model provides much richer information to the student compared to training on the training data (eg. only a one-hot encoded label for a classification task).
+
+	* + Smaller model, big speed gain at inference
+	* - Need access or train a teacher model, expensive: requires ~5-10% of teacher training compute (DistilBert is 40% smaller, 60% faster and retains 97% of NLU capabilities of BERT, but trained on 8 16GB V100s for 90 hours)
 
 #### Post-Training Model Quantization
 Here I quantize the finetuned distilled LLM using [GPTQ](https://arxiv.org/pdf/2210.17323.pdf)/GGML with the [huggingface implementation](https://huggingface.co/docs/transformers/main_classes/quantization).
+
+	* Weight quantization: store model weights in ```int8``` and dequantize to ```fp32``` for inference. This is not faster but saves space (fp32->int8: 4x).
+	* Activation quantization: convert all inputs/outputs into ```int8``` and do computations in ```int8```. Need for (static/dynamic) calibration to determine layer scale factors. This allows faster inference but can require specific hardware.
+
+#### Post-Training Model Pruning
+The idea is to remove some connections in the neural network, resulting in a sparse network. The choice of pruning method depends on the inference hardware.
+
+	* Magnitude pruning: select pruning factor x (proportion of connections to remove), set lower x% of weights (by absolute value) to 0. Sometimes retrain the model for a few more epochs after pruning. Inference is not faster and doesn't save disk space. However, using sparse matrix multiplication allows faster inference if the hardware supports these operations.
+	* Structured pruning: follow a pruning structure. Store only non-0 values according to a structured sparsity pattern (compression).
 
 #### Flash-Attention
 I will implement [Flash-Attention](https://arxiv.org/abs/2205.14135) using this [repo](https://github.com/Dao-AILab/flash-attention). Attention has O(n^2) time and memory complexity. Traditionally, K, Q and V vectors are stored in High Bandwidth Memory (HBM) which is large in memory but slow in processing. Traditional attention implementation loads keys, queries, and values from HBM to GPU on-chip SRAM, performs a single step of the attention mechanism, writes it back to HBM, and repeats this for every single attention step. Flash-Attention loads the K, Q and V vectors once, fuses the operations of attention and writes them back to memory.
@@ -333,11 +296,16 @@ I will implement [Flash-Attention](https://arxiv.org/abs/2205.14135) using this 
 #### Other
 I will implement [Multi-Query Attetion (MQA)](https://arxiv.org/abs/1911.02150), [Grouped-Query Attention (GQA)](https://arxiv.org/abs/2305.13245), [Rotary embeddings](https://arxiv.org/abs/2104.09864), [Alibi](https://arxiv.org/abs/2108.12409) and DeepSpeed to achieve lower latency on generation. I will also explore multiprocessing for inputs and model/data parallelism for inference.
 
+	* ONNX inference library: 
+	* Tensorflow Light library:
 	* MQA:
 	* GQA:
-	* Rotary Embeddings:
-	* Alibi:
+	* Rotary Positional Embeddings (RoPE): Apply rotation to token vector instead of adding positional embedding by m*theta according to position m of token in the sentence. Relative positions of tokens are preserved. (ALiBi~Sinusoïdal>rotary>T5 relative).
+	* ALiBi:
+	* Smart K/V caching: don't recompute matmul between K.V at each generation step, takes up a lot of memory (2*precision_bytes*n_layers*d_model*seqlen*batch). Once KV cache is computed, lower latency per token generation.
 	* DeepSpeed: weights are moved to and from CPU to GPU depending on the required layers in the forward pass.
+
+![qa](media/inference_optim.png)
 
 ## Chatbot Implementation
 
