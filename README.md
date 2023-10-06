@@ -120,7 +120,7 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 #### Open-Source Implementation
 - [ ] Setup Constitutional model in Langchain
 - [ ] Setup LLama2 as LLM
-- [ ] Setup sentence-transformers for document embeddings
+- [ ] Setup sentence-transformers/BGE for document embeddings
 - [ ] Tokenizer
 - [ ] FAISS
 
@@ -129,8 +129,9 @@ These techniques retrieve entities or entity mentions, retrieved context goes to
 - [x] Fine-Tune LLama2 (multi-gpu accelerate) on ML document corpus with 4-bit QLoRA
 - [ ] Fine-Tune Llama2 on ML document QA dataset
 - [ ] Fine-Tune Llama2 on chatbot interaction history
-- [ ] Fine-Tune Llama2 on Alpaca dataset
+- [ ] Fine-Tune Llama2 on Alpaca/Dolly/Evol-Instruct/etc. dataset
 - [ ] Setup Pytorch DDP training
+- [ ] Test RLHF/DPO/SLiC/RSO for aligment
 
 #### Performance Evaluation
 - [ ] Assess quality of RAG outputs with Ragas
@@ -194,6 +195,7 @@ ReAct (Reasoning/Action) Agents use an LLM to determine which actions to take an
 	- CAMEL: 2 agents in a simulation environment (chatroom), simulation good for evaluation
 	- Generative Agents: 25 agents in "sims" simulated world, time/importance/relevancy-weighted memory, reflection step
 	- HuggingGPT: task planner, connects AI models to solve AI tasks (ChatGPT selects models based on their huggingface description, executes subtasks and summarizes response)
+	- AutoGen: 
 
 ## Guardrails RAG
 Guardrails are used for safety and topic guidance, to setup a deterministic dialogue flow, for RAG and conversational agents. Guardrails can enhance safety and reduce chatbot response latency if using RAG (Agent chooses to use a retrieval KB tool if necessary, otherwise the chatbot answers regular queries without retrieval, hence one less LLM call).
@@ -218,7 +220,7 @@ bash /Applications/Python*/Install\ Certificates.command
 ## FLARE RAG
 
 ## Open-Source Implementation
-After prototype a base system with OpenAI ```gpt-3.5-turbo``` API, the goal is to implement an open-source RAG Chatbot, leveraging ```Llama-2``` as the LLM and sentence-transformers as the vector embedding model. 
+After prototype a base system with OpenAI ```gpt-3.5-turbo``` API, the goal is to implement an open-source RAG Chatbot, leveraging ```Llama-2-7b``` as the LLM and ```sentence-transformers``` as the vector embedding model. I will also try out the new ```mistral-7b``` as it seems to beat ```Llama-2-13b``` on most benchmarks. It will also be interesting to try out the ```orca``` model (trained on millions of GPT-4 outputs) since it supposedly outperforms LLama2.
 
 #### Vector Embedding Fine-Tuning
 A model such as ```text-embedding-ada-002``` trained on classic Information Retrieval datasets (eg. MSMarco, TREC, BeIR, MTEB) may not adapt well to out of domain text. It is thus of interest to investigate the performance of a custom embedding model trained on a specialized corpus.
@@ -230,7 +232,7 @@ A model such as ```text-embedding-ada-002``` trained on classic Information Retr
 It is necessary to fine-tune the LLM to boost out-of-the-box performance. Experiments have shown that LLama-2 65B trained with [QLoRA](https://arxiv.org/abs/2305.14314) on the alpaca dataset achieves 99.3% of the performance level of ChatGPT. QLoRA (Quantization-Aware training) is a paradigm leveraging PEFT (LoRA) and quantization to train a model on a single GPU or multiple GPUs with limited memory. LoRA modifies the linear projection layers of self-attention blocks using low rank matrices which reduces number of trainable parameters while preserving the model parametric knowledge. The LLM weights are frozen quantized to 4-bit and only the LoRA adapter weights are finetuned in 16-bit. Other innovations such as the introdution of the ```nf4``` datatype, double quantization and page optimizers allow me to efficiently train ```LLama-2-7b``` in parallel on 4 Tesla-V100 GPUs in XX hours. For more details on the multi-GPU training implementation, see the [qlora-multi-gpu repo](https://github.com/ChrisHayduk/qlora-multi-gpu/tree/main) and [huggingface](https://huggingface.co/blog/pytorch-ddp-accelerate-transformers).
 
 #### Causal Language Modelling (CLM)
-The first fine-tuning round of ```LLama-2-7b``` consists of optimizing the loss on the CLM task (autoregressive method where the model is trained to predict the next token in a sequence given the previous token) with a corpus of ML documents (about 60'000, only the content section). Here I use 4-bit QLoRA training on 4 GPUs.
+The first fine-tuning round of ```LLama-2-7b``` consists in optimizing the loss on the CLM task (autoregressive method where the model is trained to predict the next token in a sequence given the previous tokens) with a corpus of ML documents (about 60'000, only the content section). Here I use 4-bit QLoRA training on 4 GPUs.
 
 ```
 # with python3 (model parallelism, device_map="balanced)
@@ -248,8 +250,8 @@ Here I finetune ```llama-2-7b``` on the scraped ML papers dataset, where I gener
 #### Conversation finetuning
 Here I finetune ```llama-2-7b``` on a chatbot conversation dataset.
 
-#### Alpaca finetuning
-Here I finetune ```llama-2-7b``` on the Alpaca dataset (format: task instruction, input context, response) in the self-instruct style for model alignment:
+#### Alpaca/Dolly/Evol-Instruct finetuning
+Here I finetune ```llama-2-7b``` on the Alpaca/Dolly/Evol-Instruct dataset (format: task instruction, input context, response) in the self-instruct style for model alignment:
 
 ```
 # alpaca example
@@ -289,23 +291,22 @@ The idea is to remove some connections in the neural network, resulting in a spa
 	* Structured pruning: follow a pruning structure. Store only non-0 values according to a structured sparsity pattern (compression).
 
 #### Flash-Attention
-I will implement [Flash-Attention](https://arxiv.org/abs/2205.14135) using this [repo](https://github.com/Dao-AILab/flash-attention). Attention has O(n^2) time and memory complexity. Traditionally, K, Q and V vectors are stored in High Bandwidth Memory (HBM) which is large in memory but slow in processing. Traditional attention implementation loads keys, queries, and values from HBM to GPU on-chip SRAM, performs a single step of the attention mechanism, writes it back to HBM, and repeats this for every single attention step. Flash-Attention loads the K, Q and V vectors once, fuses the operations of attention and writes them back to memory.
+I will investigate [Flash-Attention](https://arxiv.org/abs/2205.14135) using this [repo](https://github.com/Dao-AILab/flash-attention). Attention has O(n^2) time and memory complexity. Traditionally, K, Q and V vectors are stored in High Bandwidth Memory (HBM) which is large in memory but slow in processing. Traditional attention implementation loads keys, queries, and values from HBM to GPU on-chip SRAM, performs a single step of the attention mechanism, writes it back to HBM, and repeats this for every single attention step. Flash-Attention loads the K, Q and V vectors once, fuses the operations of attention and writes them back to memory.
 
 ![flash-attention](media/flash_attention.png)
 
 #### Other
-I will implement [Multi-Query Attetion (MQA)](https://arxiv.org/abs/1911.02150), [Grouped-Query Attention (GQA)](https://arxiv.org/abs/2305.13245), [Rotary embeddings](https://arxiv.org/abs/2104.09864), [Alibi](https://arxiv.org/abs/2108.12409) and DeepSpeed to achieve lower latency on generation. I will also explore multiprocessing for inputs and model/data parallelism for inference.
+I will investigate [Multi-Query Attetion (MQA)](https://arxiv.org/abs/1911.02150), [Grouped-Query Attention (GQA)](https://arxiv.org/abs/2305.13245), [Rotary embeddings](https://arxiv.org/abs/2104.09864), [Alibi](https://arxiv.org/abs/2108.12409), DeepSpeed, ONNX, [FasterTransformer](https://github.com/NVIDIA/FasterTransformer), [batch-inference](https://github.com/microsoft/batch-inference), [text-generation-inference](https://github.com/huggingface/text-generation-inference), [vLLM](https://github.com/vllm-project/vllm) to achieve lower latency on generation. I will also explore multiprocessing for inputs and model/data parallelism for inference.
 
 	* ONNX inference library: 
 	* Tensorflow Light library:
-	* MQA:
-	* GQA:
+	* MQA: Multi-Query Attention
+	* GQA: Grouped-Query Attention
+	* SWA: Sliding Window Attention [paper](https://arxiv.org/pdf/1904.10509.pdf), [paper](https://arxiv.org/pdf/2004.05150v2.pdf)
 	* Rotary Positional Embeddings (RoPE): Apply rotation to token vector instead of adding positional embedding by m*theta according to position m of token in the sentence. Relative positions of tokens are preserved. (ALiBi~Sinusoïdal>rotary>T5 relative).
 	* ALiBi:
 	* Smart K/V caching: don't recompute matmul between K.V at each generation step, takes up a lot of memory (2*precision_bytes*n_layers*d_model*seqlen*batch). Once KV cache is computed, lower latency per token generation.
 	* DeepSpeed: weights are moved to and from CPU to GPU depending on the required layers in the forward pass.
-
-![qa](media/inference_optim.png)
 
 ## Chatbot Implementation
 
@@ -379,6 +380,8 @@ The conversation entity memory keeps a recollection of the main entities that ha
 
 	* Evaluate LM with perplexity (-log(logit)) or downstream task accuracy
 
+	* Evaluate Chatbot on MT-Bench with LLM-as-a-judge [paper](https://arxiv.org/abs/2306.05685)
+
 ## How to use
 ```
 # create and activate virtualenv
@@ -386,7 +389,9 @@ python3 -m venv venv_rag
 source venv_rag/bin/activate
 ```
 
+### VirtualEnv setup
 Use the following CLI args:
+
 	- ```s```: semantic search
 	- ```q```: question answering
 	- ```c```: chatbot
